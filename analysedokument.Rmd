@@ -1,0 +1,243 @@
+---
+title: "En kvantitativ analyse af sprogressourcer på sprogteknologi.dk"
+author: "Toke Jøns Mulvad"
+date: "2024-03-05"
+output: html_document
+---
+
+Herunder fremgår en analyse af metadata på sprogressourcer på sprogteknologi.dk. I overensstemmelse med FAIR-principperne vil hvert kodestykke være forklartet forud med henblik på at tilgængeliggøre de programmatiske tiltag. Den indsamlede data er indhentet ved at gennemgå de enkelte sprogressourcer på 'sprogteknologi.dk/group/corpora'. Indsamlingen tog sted fra den
+
+# Forberedende arbejde - Indlæsning af R-pakker
+
+R har som programmeringssprog en række grundlæggende funktioner og metoder til manipulering og visualisering. Men i kraft af at teknologien er åben og tilgængelig, findes der en stor brugerbase som videreudvikler på de indboende funktioner, disse brugerudviklede funktionspakker kaldes 'packages'. Funktionspakkerne bliver distribuerede, opbevarede og vedligeholdt ved hjælp af CRAN, som er et netværk af servere og protokoller (The Comprehensive R Archive Network, 2024).
+
+For at installere en funktionspakke benyttes funktionen 'install.packages()'. En funktionspakke skrives da i citationstegn ("funktionspakke"). Eftersom dette projket benytter sig af flere funktionspakkker skrives pakkerne i en liste, som gøres ved at skrive 'c()'. I denne liste skrives hver funktionspakke og sepereres med ','. Denne funktion skal kun køres en gang, eftersom funktionspakkerne bliver installeret på den enhed som anvendes til undersøgelsen.
+
+```{r installering af pakker, echo=FALSE}
+install.packages(c("tidyverse", "wordcloud", "RColorBrewer", "tidytext", "ggplot2"))
+```
+
+Pakken 'tidyverse' og 'tidytext' indeholder en lang række funktioner med henblik på at rense data (data cleaning), manipulering og visualisering. 'RColorBrewer', 'ggplot2' og 'wordcloud' indeholder funktioner til at visualisere data.
+
+```{r indlægning af pakker, echo=FALSE}
+library(tidyverse)
+library(tidytext)
+library(RColorBrewer)
+library(wordcloud)
+library(ggplot2)
+```
+
+### Indhentning af data
+
+Dataen er indhentet fra sprogteknologi.dk i perioden 14-04-2024 til 20-04-2024 (<https://sprogteknologi.dk/group/corpora>). Herunder indhentes den indsamlede data fra filen 'sprogteknologi_data.csv', med funktionen 'read_delim()', som anvendes til at indhente data i R. Inde i funktionen angives filnavnet mellem citationstegn ("filnavn"), og efterfølges af hvilket tegn der adskiller værdierne i filen. I dette tilfælde er den anvendte værdi semikolon (';'), hvilket angives mellem citationstegn ("tegn"). For at den indlæste data indhentes og gemmes i R projektet, skal det gemmes under en variabel, som er et navn (her 'data') for noget information. Den venstre pegende pil ('\<-'), er en operator som fortæller at alt på højre side af pilen skal gemmes under den angivet variabel.
+
+```{r}
+data <- read_delim("sprogteknologi_data.csv", delim = ";")
+```
+
+Herunder vises det hvordan den indhentede data ser ud i R, ved at bruge funktionen 'print()', som viser den data en givet variabel indholder.
+
+```{r}
+print(data)
+```
+
+Den indsamlede data fra sprogteknologi.dk består af: 'Navn' på ressourcen Den 'Organisation' som står bag ressourcen; Hvilken 'Type' ressourcen er; Det naturlige 'Sprog' ressourcen indeholder; Hvilke(n) 'Filtype' som ressourcen kan hentes i; Hvilken 'Periode' ressourcen stammer fra og til; Nøgleord ('Tags') om hvad ressourcen består af; Emneord ('Emne') om hvad ressourcen kan anvendes til; Et 'url'-link til ressourcens hjemmeside; Ressourcens 'licens'; 'Dokumentation' til at vejlede i anvendelse af ressourcen.
+
+Nu efter at data er blevet indhentet og præsenteret som det ser ud uden nogen datamanipulering er vi klar til at påbegynde den kvantitative undersøgelse af materialet.
+
+# Analyse
+
+### Analyse - Manglende metadata
+
+Herunder gives et overblik af hvor mange værdier der mangler i hver kolonne i datasættet. Dette anvendes til at styre hvilke efterfølgende undersøgelser der bliver fortaget og giver et umiddelbart indblik i hvor fyldestgørende den angivet metadata er for sprogressourcerne. Først angives det hvilken data vi ønsker at bearbejde ved at skrive navnet på variablen (her 'data'). Derefter anvendes operatoren '%\>%', som også kaldes et rør (fra det engelske "pipe"). En metafor for hvordan denne operator fungere er at den angivet variabel hældes ned gennem alle de efterfølgende manipuleringer. Her hældes vores variabel 'data' altså først ned i funktionen 'select()', som vælger de værdier vi ønsker at bearbejde i 'data', i select-funktionen er der angivet endnu en funktion, 'everything()', som vælger alle værdier i 'data'. Derfor har vi nu valgt (med 'select()') alle værdier (med 'everything()'). Derefter hældes 'data' videre over i den næste funktion, gennem endnu et rør. Her bruges funktionen 'summarise_all()' til at opsummere de værdier den gives. Inde i funktionen angives endnu en funktion, 'funs()', som laver en liste over de navngivet variabler som vi valgte med 'select(everything())'. Med funktionen, 'is.na(.)', i 'funs()', siger man at R skal fokusere på de manglende værdier, som fremgår i vores data som 'NA'.
+
+```{r }
+data %>% 
+  select(everything()) %>% 
+  summarise_all(funs(sum(is.na(.))))
+```
+
+På baggrund af denne oversigt er det tydeligt at fire typer metadata er stærkt overset eftersom omkring halvdelen af de 83 sprogressourcer mangler metadata om 'Type', 'Periode (Start)', 'Periode (Slut)' og 'Dokumentation'. Derfor fokuseres den kvantitative undersøgelse andet mere repræsentativt metadata for sprogressourcer på sprogteknologi.dk, som 'Navn', 'Organisation', 'Sprog', 'Tags' og 'Emne'.
+
+### Analyse - Organisationer
+
+Herunder analyseres organisationerne bag sprogressourcerne som opgivet i deres metadata. Først optælles organisationerne bag sprogressourcerne, derefter visualiseres optællingen for at gøre dataen mere tilgængelig for undersøgelse.
+
+Først angives den data man ønsker at undersøge ved at give navnet på variablen det er gemt under. Igen anvendes et rør for at gennemføre manipuleringer af dataen. Her optælles de hvor mange sprogressourcer de forskellige organisationer i dataen har. Med funktionen, 'count()', kan man tælle hvor de antal gange en værdi optræder i et datasæt ved at angive navnet på den kolonne man ønsker at tælle på. Man kan også fortælle funktionen at den skal angive de optalte værdier i en ordnet liste ved at skrive ', sort = TRUE' efter navnet på kolonnen man ønsker at tælle.
+
+```{r org}
+data %>% 
+  count(Organisation, sort = TRUE)
+```
+
+Det er tydeligt EU har flest sprogressourcer ud af de 24 organisationer der er i datasættet, men for at fremhæve forskellene mellem hvor mange sprogressourcer hver organisation i visualiseres dette nedenfor.
+
+Her gentages den forrige kode for at optælle organisationerne, derefter isoleres den data vi ønsker at bearbejde med funktionen, 'mutate()', hvor det angives hvilke værdier i variablen der skal isoleres. Så anvendes, '= reorder()' til at forberede dataen på visualisering og gør at dataen bliver sorteret i visualiseringen, ved at dataen 'Organisation' oplistes efter hvor mange gange de fremgår, 'n'. Dette føres videre med et rør til den egentlige visualisering med funktionen, 'ggplot()', inde i funktionen gentages det hvilken data der skal visualiseres, 'aes()', med antallet af observationer, 'n', i kolonnen, 'Organisation'. I funktionspakken, 'ggplot', har '+' den samme funktion som '%\>%'. Derefter angives det hvilken type graf der skal visualiseres, her bruges, 'geom_col()', da visualiseringen skal være et horisontalt søjlediagram. Endeligt benyttes 'labs()' til at angive hvilket navn y- og x-aksen skal hedde ved at skrive det ønskede navn. X-aksen gives navnet 'Antal ressourcer' efter 'x='. For at organisationernes navne er i fokus ønskes der ikke noget navn på y-aksen, derfor angives 'y=' værdien 'NULL', som betyder at y-aksens navn ikke skal være noget. Hvis akserne ikke aktivt gives navne med 'labs()' får de automatisk navnene i 'aes()'.
+
+```{r }
+data %>% 
+  count(Organisation, sort = TRUE) %>% 
+  mutate(Organisation = reorder(Organisation, n)) %>% 
+  ggplot(aes(n, Organisation))+
+    geom_col()+
+    labs(x="Antal ressourcer", y=NULL)
+```
+
+### Analyse - Textmining og Ordsky
+
+Herunder splittes navnene på sprogressourcerne ad, så de forekommer som enkelte ord. Funktionen, 'unnest_tokens()', anvendes til at dele variabler bestående af flere ord op i enkelte ord, men beholde alt den omliggende data i datasættet. For at gøre dette angives det inde i funktionen hvilken kolonne funktionen skal udføres på 'Navn'. Da funktionen 'unnest_tokens()' skaber en ny kolonne i datasættet med de enkelte ord, skal det også angives hvad den nye kolonne skal hedde, her anvendes ordet 'word'. Grunden til anvendelsen af det engelske ord for 'ord' benyttes forklares senere, da det har betydning for en senere datamanipulering. Endeligt gemmes disse indgreb i dataen under en ny variabel, ved at benytte pil operatoren '-\>', som gemmer alt på venstre side af pilen i variablen til højre for pilen, her under navnet 'navne_data'.
+
+```{r navn}
+data %>% 
+  unnest_tokens(word, Navn) -> navne_data
+```
+
+Vi kan da se hvordan dette manipulere det originale datasæt med 'print()'. Nu er hvert ord i ethvert navn blevet til sin egen række i datasættet, og indeholder stadig alle de tilhørende data.
+
+```{r navn}
+print(navne_data)
+```
+
+Optæl ordene med ligende kode som forklaret under analysen af organisationer. I stedet for organisationer tælles det hvilke ord der fremgår.
+
+```{r navn}
+navne_data %>% 
+  count(word, sort=TRUE)
+```
+
+Ud fra optælligen kan det ses at nogle af de mest hyppigt forekommende ord er såkaldte fyldeord, som 'from', 'the' og 'fra', hvilket ikke siger særlig meget om det egentlige indhold, derfor ønskes det at frasortere disse fyldeord.
+
+Dette opnås med stopordslister. Stopordsliser indeholder en lang række fyldeord. Herunder indhentes en stopordsliste over danske stopord, som er blevet udarbejdet af Bertel Torp og gjort tilgængelig på github. Som udgangspunkt indhentes stopordslisten på samme måde som den indsamlede data fra sprogteknologi.dk blev indhentet, her anvendes funktionen, 'read_csv()'. For at understøtte det efterfølgende kodestykke sættes navnet på kolonnen i dataen til navnet 'word', ved at skrive det nye navn mellem citationstegn efter metoden, 'col_names ='.
+
+```{r navn}
+stopord <- read_csv("https://gist.githubusercontent.com/berteltorp/0cf8a0c7afea7f25ed754f24cfc2467b/raw/fa34ef448aff6adbb4b6bab9bda62a8b0f1ee597/stopord.txt", col_names = "word")
+```
+
+Herunder vises det hvordan stopordlisten er opbygget af enkelte fylde ord per række.
+
+```{r navn}
+print(stopord) 
+```
+
+Herunder hældes variablen 'navne_data' gennem funktionen, 'anti_join()', som går ind og fjerner alle overensstemmende værdier, først i 'navne_data' og 'stopord' der fjerner alle de danske stopord, og efterfølgende i 'navne_data' og 'stop_words', som er en indbygget stopordsliste i R som indeholder engelske fyldeord. Fordi 'stop_words' kun fungerer på kolonner navngivet "word", har vi anvendt samme navngivning i datasættet og til den danske stopordsliste. Til sidst gemmes datasættet uden fyldeord under en ny variabel, 'navne_data_u_stopord'.
+
+```{r navn}
+navne_data %>%  
+  anti_join(stopord) %>% 
+  anti_join(stop_words) -> navne_data_u_stopord
+```
+
+For forklaring henvises der til optælling af organisationer
+
+```{r navn}
+navne_data_u_stopord %>% 
+  count(word, sort = TRUE)
+```
+
+Nu da dataen over navne blevet manipuleret og renset, så den er klar til at blive visualiseret.
+
+#### Ordsky
+
+For at lave en ordsky gentages først optællingskoden for oven, derefter fremgår koden som visualisere den rensede data. For at gøre dette anvendes funktionen, 'with()', som transformere dataen til at kunne blive udtrykt som en ordsky, altså er 'with()'-funktionen et forberedende trin inden funktionen 'wordcloud'. Ligesom visualiseringen af organisationer anvises det først hvilke værdier der skal visualiseres, 'word', er ordene og 'n', er hvor mange gange et ord forekommer. Derefter angives en nedre grænse for hvor få forekomster et ord skal have for at blive inkluderet med argumentet, 'min.freq=', som her sættes lig tre. Altså ekskluderes alle de ord som kun forekommer to eller en gang(e). Så er det muligt at angive hvilken farve ordene i ordskyen skal visualiseres i med, 'colors =', værdien kan da blive angivet i en hex-kode, som er en kategorisering af farver i koder. Hver gang kodeblokken køres dannes visualiseres ordene i en ny formation.
+
+```{r navn}
+navne_data_u_stopord %>%
+  count(word, sort=TRUE) %>% 
+  with(wordcloud(word,n,min.freq=3, colors = "#082444"))
+```
+
+### Analyse - Sprog
+
+For at analysere hvilke sprog sprogressourcerne indeholder bliver dataen først manipuleret, hvorved metadataen om sprog udfoldes og isoleres.
+
+Først benyttes funktionen, 'mutate()', til at manipulere kolonnen, 'Sprog'. Her opdeles de sprogressourcer som indeholder mere en ét sprog, ved at benytte funktionen, 'str_split()', som fungere ved at opdele ord og sætninger ved at dele dem på et bestemt tegn eller mønster. Her defineres stedet som værdierne i 'Sprog' skal deles på som kolon, der er blevet anvendt i datasættet til at opdele værdierne når flere værdier var angivet under et punkt i metadataen. Efter dette benyttes funktionen, 'unnest()', som gør at sprog med flere sprog bliver gentaget lige så mange gang som de har antal af sprog, men kun med et sprog per række. Til sidst gemmes den manipulerede data i variablen, 'sprog_data'.
+
+```{r tags}
+data %>% 
+  mutate(Sprog = str_split(Sprog, ":")) %>% 
+  unnest(Sprog) -> sprog_data
+```
+
+Vi kan da se hvordan koden har manipulere det originale datasæt med 'print()'. Nu er hvert sprog for hver ressource blevet til sin egen række i datasættet, og indeholder stadig alle de tilhørende data.
+
+```{r }
+print(sprog_data)
+```
+
+Herunder udføres en ligende kodning som forklares under analysen af organisationer, som optæller de enkelte sprog i sprogressourcerne på sprogteknologi.dk.
+
+```{r }
+sprog_data %>% 
+  count(Sprog, sort = TRUE)
+```
+
+Herunder udføres en ligende kodning som forklares under analysen af organisationer. Til forskel for den forrige optælling laver det understående kodestykke en optælling af sprogsammensætningerne i sprogressourcerne.
+
+```{r }
+data %>% 
+  count(Sprog, sort = TRUE)
+```
+
+### Analyse - Tags
+
+For forklaring af dette kodestykke se analysen af sprog.
+
+```{r tags}
+data %>% 
+  mutate(Tags = str_split(Tags, ":")) %>% 
+  unnest(Tags) -> tag_data
+```
+
+Herunder udføres ligende kodning som forklares under analysen af organisationer.
+
+```{r tags}
+tag_data %>% 
+  count(Tags, sort=TRUE)
+```
+
+Denne visualisering følger samme tilgang som forklaret under analysen af organisationer. Dog anvendes funktionen, 'filter()' som filtrere værdierne den gives, ved at skrive, 'n\>1', angives det at værdier som fremgår mindre end 2 gange skal frasorteres fra visualiseringen.
+
+```{r }
+tag_data %>% 
+  count(Tags, sort = TRUE) %>% 
+  filter(n>1) %>% 
+  mutate(Tags = reorder(Tags, n)) %>% 
+  ggplot(aes(n, Tags))+
+    geom_col()+
+    labs(x="Antal ressourcer", y=NULL)
+```
+
+### Analyse - Emner
+
+For forklaring se analysen af sprog.
+
+```{r emne}
+data %>% 
+  mutate(Emne = str_split(Emne, ":")) %>%
+  unnest(Emne) -> emne_data
+```
+
+For forklaring se analysen af organisationer.
+
+```{r emne}
+emne_data %>% 
+  count(Emne, sort=TRUE)
+```
+
+For forklaring se visualisering under analysen af organisationer.
+
+```{r }
+emne_data %>% 
+  count(Emne, sort = TRUE) %>% 
+  mutate(Emne = reorder(Emne, n)) %>% 
+  ggplot(aes(n, Emne))+
+    geom_col()+
+    labs(x="Antal ressorucer", y=NULL)
+```
+
+# Anvendte resourcer
+
+R for Data Science: <https://r4ds.hadley.nz/data-import.html> 
+Sprogteknologi.dk: <https://sprogteknologi.dk/group/corpora> 
+The R Graph Gallery: <https://r-graph-gallery.com/barplot.html> 
+Text Mining with R, A Tidy Approach: <https://www.tidytextmining.com/>
