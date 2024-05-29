@@ -233,7 +233,7 @@ emne_data %>%
   mutate(Emne = reorder(Emne, n)) %>% 
   ggplot(aes(n, Emne))+
     geom_col()+
-    labs(x="Antal ressorucer", y=NULL)
+    labs(x="Antal ressourcer", y=NULL)
 ```
 
 
